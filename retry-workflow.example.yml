@@ -1,0 +1,52 @@
+name: 免费最低配置重试
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: validate 只运行本地模拟测试；check 只读检查；retry 实际尝试免费创建
+        type: choice
+        options: [validate, notify-test, check, retry]
+        default: validate
+  schedule:
+    # Beijing 14:23–23:23 hourly, plus 08:23. Maximum 11 jobs/day.
+    # 31 days * 11 * 5 minutes = 1705, below the 2000 included minutes.
+    - cron: '23 0,6-15 * * *'
+
+permissions:
+  contents: read
+  issues: write
+  actions: write
+
+concurrency:
+  group: oci-single-free-instance
+  cancel-in-progress: false
+
+jobs:
+  retry:
+    if: github.event_name == 'workflow_dispatch' || vars.RETRY_ENABLED == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # verified v4
+        with:
+          persist-credentials: false
+      - name: 安装官方 SDK（不使用缓存或产物存储）
+        run: python3 -m pip install --disable-pip-version-check --no-cache-dir -r requirements.txt
+      - name: 验证免费限制及防重复逻辑
+        run: python3 -m unittest -v test_retry.py
+      - name: 云端检查或重试
+        if: github.event_name == 'schedule' || inputs.mode != 'validate'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RETRY_ENABLED: ${{ vars.RETRY_ENABLED }}
+          MODE: ${{ github.event_name == 'schedule' && 'retry' || inputs.mode }}
+          OCI_TENANCY: ${{ secrets.OCI_TENANCY }}
+          OCI_USER: ${{ secrets.OCI_USER }}
+          OCI_FINGERPRINT: ${{ secrets.OCI_FINGERPRINT }}
+          OCI_KEY_CONTENT: ${{ secrets.OCI_KEY_CONTENT }}
+          OCI_COMPARTMENT: ${{ secrets.OCI_COMPARTMENT }}
+          OCI_SUBNET: ${{ secrets.OCI_SUBNET }}
+          OCI_IMAGE: ${{ secrets.OCI_IMAGE }}
+          SSH_PUBLIC_KEY: ${{ secrets.SSH_PUBLIC_KEY }}
+        run: python3 retry.py
