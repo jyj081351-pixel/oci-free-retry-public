@@ -2,7 +2,17 @@
 
 本文件按账户所有者要求公开。核验日期：2026-11-22。仅发布 SSH 公钥及必要的脱敏交接信息，不包含私钥、密码、API 密钥、真实邮箱、云资源编号或公网 IP。
 
-**交接状态：文件准备不等于旧任务已停止。核验时私有 GitHub 工作流仍启用，`RETRY_ENABLED=true`；本次没有修改其启停状态，也没有发起创建请求。Luna 正式创建前必须先完成下文的单执行端切换。**
+**交接状态（已更新）：私有仓库的「免费最低配置重试」已按所有者要求手动停用。已逐页检查全部 93 条运行记录，均处于已结束状态，没有正在运行、排队或等待中的任务。GitHub 旧执行端已退出，可以由 Luna 继续接管准备；正式创建前仍须检查实际 OCI 资源并衔接私有状态，确保只创建一台。**
+
+### 2026-11-22 停用核验记录
+
+- 停用确认时间：`2026-11-22T08:14:57Z`（洛杉矶 11 月 22 日 00:14:57 PST；北京时间 16:14:57）。GitHub 明确显示 `This workflow was disabled manually.`。
+- 全量运行检查完成：`2026-11-22T08:18:13Z`（洛杉矶 00:18:13 PST；北京时间 16:18:13）。共 4 页、93 个不同运行编号，#1–#93 全部已结束；其中历史失败记录也已终止，未发现活动或排队任务。
+- 最新运行仍为 [#93](https://github.com/jyj081351-pixel/oci-free-retry/actions/runs/44999157877)，已完成，耗时 2 分 52 秒；真实创建结果见第 4 节。
+- 不需要取消正在执行的请求；本次没有发起新运行、没有创建或修改 OCI 资源。
+- 重新读取私有状态：`phase=ready`、`last_result=Out of host capacity`，没有实例 ID，更新时间仍为 `2026-11-22T07:41:19.986184+00:00`。`ready` 是此前缺货后的业务状态，不表示 GitHub 工作流仍在运行；为便于 Luna 衔接，没有改写这条状态。
+- 本次停用的是 GitHub 工作流本身；`RETRY_ENABLED` 变量保留原值 `true`，代码、凭据及历史记录保留。**不要重新启用此工作流与 Luna 并行运行。**
+- 本次没有直接查询 OCI 实例清单。Luna 接管后先只读核对云端实例、系统盘和现有私有状态；发现实例或未明确请求时只跟进，不能重新建第二台。
 
 ## 1. 原来建机器使用的 SSH 公钥
 
@@ -18,7 +28,7 @@ ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDSwphWbDumEtMDqhDTVjvUDnffPfx/qZVDQO1jvYhT
 - 对应 SSH 私钥仍由账户所有者保管，本交接没有读取或上传私钥。Luna 创建机器只需要公钥；如需验证 SSH 登录，另由持有私钥的所有者执行或通过安全途径授权。
 - GitHub Secrets 的已保存明文无法从界面回读；这里核验的是原任务本地保存公钥，不把掩码 `***` 当成密钥内容验证。
 
-## 2. 要停止的是哪个 GitHub 定时任务
+## 2. 已停止的是哪个 GitHub 定时任务
 
 | 项目 | 精确值 |
 |---|---|
@@ -30,13 +40,15 @@ ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDSwphWbDumEtMDqhDTVjvUDnffPfx/qZVDQO1jvYhT
 | 分支 | `main` |
 | 计划表达式（UTC） | `23 0,6-15 * * *` |
 | 北京时间计划 | 每天 08:23，以及 14:23–23:23 每小时一轮，共 11 轮；实际调度可能延迟 |
-| 重试开关（核验时） | Repository variable `RETRY_ENABLED=true` |
+| 工作流状态（最新核验） | **已手动停用（Disabled）** |
+| 活动运行（最新核验） | **0；全部 93 条运行均已结束** |
+| 重试变量（保留原值） | Repository variable `RETRY_ENABLED=true`；工作流本身已停用 |
 | 定时事件运行模式 | `MODE=retry` |
 | 并发组 | `oci-single-free-instance`，`cancel-in-progress: false` |
 
-[打开正确的私有工作流](https://github.com/jyj081351-pixel/oci-free-retry/actions/workflows/retry.yml)（需要有权限的 GitHub 登录）。在此页面右上角 **Workflow options → Disable workflow** 停止后续调度。不要停错到本公开仓库；公开仓库只是代码参考，没有生产定时工作流。
+[打开正确的私有工作流](https://github.com/jyj081351-pixel/oci-free-retry/actions/workflows/retry.yml)（需要有权限的 GitHub 登录）。本次已通过 **Workflow options → Disable workflow** 停止后续调度。不要再次启用；公开仓库只是代码参考，没有生产定时工作流。
 
-**切换顺序：**先停用上述私有工作流，确认没有 queued / in_progress / waiting 的旧运行；等待已发出的请求结果明确，再查实际 OCI 实例与系统盘及私有状态。发现已有实例或不明确的创建结果时只跟进该请求，禁止另建。确认旧执行端彻底停止且没有待核实资源后，才启动 Luna 的唯一执行端。
+**切换进度：**已完成停用上述私有工作流及确认无活动/排队任务。Luna 接下来应核对实际 OCI 实例与系统盘及私有状态。发现已有实例或不明确的创建结果时只跟进该请求，禁止另建。确认旧执行端彻底停止且没有待核实资源后，才启动 Luna 的唯一执行端。
 
 只把 `RETRY_ENABLED` 改为 `false` 不能终止已经运行的作业；突然取消正在创建的作业也不能证明云端请求已取消。GitHub 的并发组只保护该仓库工作流，不会自动锁住 Luna 的外部进程。
 
